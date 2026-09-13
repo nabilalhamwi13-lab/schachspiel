@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mein Schachspiel</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        background: #111827;
+        color: white;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    h1 {
+        margin: 20px 0 5px;
+    }
+
+    #status {
+        font-size: 20px;
+        margin: 10px;
+    }
+
+    #board {
+        width: min(92vw, 600px);
+        height: min(92vw, 600px);
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        border: 5px solid #374151;
+    }
+
+    .square {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(30px, 9vw, 65px);
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .light {
+        background: #f0d9b5;
+    }
+
+    .dark {
+        background: #b58863;
+    }
+
+    .selected {
+        outline: 5px solid #facc15;
+        outline-offset: -5px;
+    }
+
+    button {
+        margin-top: 18px;
+        padding: 12px 22px;
+        font-size: 17px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        transform: scale(1.03);
+    }
+</style>
+</head>
+
+<body>
+
+<h1>♟️ Mein Schach</h1>
+<div id="status">Weiß ist am Zug</div>
+
+<div id="board"></div>
+
+<button onclick="newGame()">Neues Spiel</button>
+
+<script>
+
+const initialBoard = [
+    ["♜","♞","♝","♛","♚","♝","♞","♜"],
+    ["♟","♟","♟","♟","♟","♟","♟","♟"],
+    [" "," "," "," "," "," "," "," "],
+    [" "," "," "," "," "," "," "," "],
+    [" "," "," "," "," "," "," "," "],
+    [" "," "," "," "," "," "," "," "],
+    ["♙","♙","♙","♙","♙","♙","♙","♙"],
+    ["♖","♘","♗","♕","♔","♗","♘","♖"]
+];
+
+let board = [];
+let turn = "white";
+let selected = null;
+
+const whitePieces = "♙♖♘♗♕♔";
+const blackPieces = "♟♜♞♝♛♚";
+
+function newGame() {
+    board = initialBoard.map(row => [...row]);
+    turn = "white";
+    selected = null;
+    drawBoard();
+}
+
+function getColor(piece) {
+
+    if (whitePieces.includes(piece)) {
+        return "white";
+    }
+
+    if (blackPieces.includes(piece)) {
+        return "black";
+    }
+
+    return null;
+}
+
+function drawBoard() {
+
+    const boardElement = document.getElementById("board");
+
+    boardElement.innerHTML = "";
+
+    for (let row = 0; row < 8; row++) {
+
+        for (let col = 0; col < 8; col++) {
+
+            const square = document.createElement("div");
+
+            square.classList.add("square");
+
+            if ((row + col) % 2 === 0) {
+                square.classList.add("light");
+            } else {
+                square.classList.add("dark");
+            }
+
+            if (
+                selected &&
+                selected.row === row &&
+                selected.col === col
+            ) {
+                square.classList.add("selected");
+            }
+
+            square.textContent = board[row][col];
+
+            square.addEventListener("click", () => {
+                handleClick(row, col);
+            });
+
+            boardElement.appendChild(square);
+        }
+    }
+
+    document.getElementById("status").textContent =
+        turn === "white"
+        ? "Weiß ist am Zug"
+        : "Schwarz ist am Zug";
+}
+
+function pathClear(row, col, newRow, newCol) {
+
+    const rowDirection = Math.sign(newRow - row);
+    const colDirection = Math.sign(newCol - col);
+
+    let r = row + rowDirection;
+    let c = col + colDirection;
+
+    while (r !== newRow || c !== newCol) {
+
+        if (board[r][c] !== " ") {
+            return false;
+        }
+
+        r += rowDirection;
+        c += colDirection;
+    }
+
+    return true;
+}
+
+function legalMove(row, col, newRow, newCol) {
+
+    const piece = board[row][col];
+    const target = board[newRow][newCol];
+
+    const pieceColor = getColor(piece);
+
+    if (!pieceColor) {
+        return false;
+    }
+
+    if (pieceColor !== turn) {
+        return false;
+    }
+
+    if (
+        target !== " " &&
+        getColor(target) === pieceColor
+    ) {
+        return false;
+    }
+
+    const dr = newRow - row;
+    const dc = newCol - col;
+
+    const absRow = Math.abs(dr);
+    const absCol = Math.abs(dc);
+
+    /*
+       BAUER
+    */
+
+    if (piece === "♙" || piece === "♟") {
+
+        const direction =
+            pieceColor === "white" ? -1 : 1;
+
+        const startingRow =
+            pieceColor === "white" ? 6 : 1;
+
+        // Normaler Zug
+        if (
+            dc === 0 &&
+            dr === direction &&
+            target === " "
+        ) {
+            return true;
+        }
+
+        // Zwei Felder vom Start
+        if (
+            dc === 0 &&
+            dr === direction * 2 &&
+            row === startingRow &&
+            target === " " &&
+            board[row + direction][col] === " "
+        ) {
+            return true;
+        }
+
+        // Schlagen
+        if (
+            absCol === 1 &&
+            dr === direction &&
+            target !== " " &&
+            getColor(target) !== pieceColor
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /*
+       TURM
+    */
+
+    if (piece === "♖" || piece === "♜") {
+
+        if (dr === 0 || dc === 0) {
+            return pathClear(row, col, newRow, newCol);
+        }
+
+        return false;
+    }
+
+    /*
+       LÄUFER
+    */
+
+    if (piece === "♗" || piece === "♝") {
+
+        if (absRow === absCol) {
+            return pathClear(row, col, newRow, newCol);
+        }
+
+        return false;
+    }
+
+    /*
+       DAME
+    */
+
+    if (piece === "♕" || piece === "♛") {
+
+        if (
+            dr === 0 ||
+            dc === 0 ||
+            absRow === absCol
+        ) {
+            return pathClear(row, col, newRow, newCol);
+        }
+
+        return false;
+    }
+
+    /*
+       SPRINGER
+    */
+
+    if (piece === "♘" || piece === "♞") {
+
+        return (
+            (absRow === 2 && absCol === 1) ||
+            (absRow === 1 && absCol === 2)
+        );
+    }
+
+    /*
+       KÖNIG
+    */
+
+    if (piece === "♔" || piece === "♚") {
+
+        return (
+            absRow <= 1 &&
+            absCol <= 1 &&
+            (absRow + absCol > 0)
+        );
+    }
+
+    return false;
+}
+
+function handleClick(row, col) {
+
+    const piece = board[row][col];
+
+    // Noch keine Figur ausgewählt
+    if (!selected) {
+
+        if (getColor(piece) === turn) {
+
+            selected = {
+                row: row,
+                col: col
+            };
+
+            drawBoard();
+        }
+
+        return;
+    }
+
+    const oldRow = selected.row;
+    const oldCol = selected.col;
+
+    // Gleiche Figur erneut anklicken
+    if (
+        oldRow === row &&
+        oldCol === col
+    ) {
+        selected = null;
+        drawBoard();
+        return;
+    }
+
+    // Andere eigene Figur auswählen
+    if (getColor(piece) === turn) {
+
+        selected = {
+            row: row,
+            col: col
+        };
+
+        drawBoard();
+        return;
+    }
+
+    // Zug prüfen
+    if (
+        legalMove(
+            oldRow,
+            oldCol,
+            row,
+            col
+        )
+    ) {
+
+        board[row][col] =
+            board[oldRow][oldCol];
+
+        board[oldRow][oldCol] = " ";
+
+        // Bauernumwandlung automatisch zur Dame
+        if (
+            board[row][col] === "♙" &&
+            row === 0
+        ) {
+            board[row][col] = "♕";
+        }
+
+        if (
+            board[row][col] === "♟" &&
+            row === 7
+        ) {
+            board[row][col] = "♛";
+        }
+
+        turn =
+            turn === "white"
+            ? "black"
+            : "white";
+
+        selected = null;
+
+        drawBoard();
+
+    } else {
+
+        selected = null;
+        drawBoard();
+    }
+}
+
+newGame();
+
+</script>
+
+</body>
+</html>
